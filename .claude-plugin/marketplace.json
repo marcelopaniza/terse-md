@@ -1,0 +1,12 @@
+{
+  "name": "marcelopaniza-terse-md",
+  "owner": {
+    "name": "Marcelo Paniza"
+  },
+  "plugins": [
+    {
+      "name": "terse-md",
+      "source": "."
+    }
+  ]
+}

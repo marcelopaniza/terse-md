@@ -1,0 +1,136 @@
+# Terse compressed-instruction schema.
+# JSON Schema draft 2020-12, written in YAML.
+#
+# Closed vocabulary: any field not defined here fails validation. That's what
+# makes the compressed output deterministic across runs and safe to edit by hand.
+#
+# All top-level sections are optional. An empty document is valid (trivial case).
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: Terse Compressed Instruction File
+type: object
+additionalProperties: false
+
+properties:
+
+  # ---- meta ----------------------------------------------------------------
+  # Bookkeeping. Version lets readers refuse formats they don't understand.
+  # source_hash is the sha256 of the raw source file that was compressed, so
+  # a later `terse-md run` on the same source is detectable as a re-run vs. drift.
+  meta:
+    type: object
+    additionalProperties: false
+    required: [version]
+    properties:
+      version:
+        type: integer
+        minimum: 1
+      source_hash:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+
+  # ---- rules ---------------------------------------------------------------
+  # Ordered list of behavioural rules. Order matters for precedence — first
+  # match wins when scopes overlap.
+  #
+  # Example:
+  #   - id: surgical-changes
+  #     scope: "*"
+  #     directive: "Every changed line must trace to an explicit user request."
+  #     forbid:
+  #       - "Improve adjacent code, comments, or formatting"
+  #       - "Refactor what isn't broken"
+  #     on_violation: abort
+  rules:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, scope, directive]
+      properties:
+        id:
+          # stable machine-readable identifier, kebab-case
+          type: string
+          pattern: "^[a-z][a-z0-9-]{1,63}$"
+        scope:
+          # "*" for global, or a short tag naming the domain this rule applies
+          # to (e.g. "git", "bash", "edit", "commit", "tests", "secrets")
+          type: string
+          pattern: "^(\\*|[a-z][a-z0-9-]{0,31})$"
+        directive:
+          # one-sentence imperative statement of the rule
+          type: string
+          minLength: 1
+          maxLength: 280
+        forbid:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 140
+        prefer:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 140
+        on_violation:
+          # what the reader should do when this rule is about to be broken
+          enum: [abort, warn, fix-and-continue, ask-user]
+
+  # ---- transforms ----------------------------------------------------------
+  # Map of task_pattern -> goal_template. Restates vague tasks as verifiable
+  # goals. Keys are kebab-case labels; values are short imperative templates
+  # that may contain {placeholders}.
+  #
+  # Example:
+  #   transforms:
+  #     add-feature: "When {condition}, the system does {behavior}. Verify: {check}."
+  #     fix-bug:     "Write a reproduction that currently fails. Make it pass."
+  transforms:
+    type: object
+    additionalProperties: false
+    patternProperties:
+      "^[a-z][a-z0-9-]{1,63}$":
+        type: string
+        minLength: 1
+        maxLength: 280
+
+  # ---- triggers ------------------------------------------------------------
+  # Map of event -> action. When {event} happens, do {action}. Events are
+  # short tags; actions are one-line directives or references to rule IDs
+  # prefixed with "rule:".
+  #
+  # Example:
+  #   triggers:
+  #     destructive-op:   "Show exact command and wait for confirmation."
+  #     secret-in-output: "Refuse. Tell user to rotate."
+  #     long-command:     "rule:run-in-background-if-slow"
+  triggers:
+    type: object
+    additionalProperties: false
+    patternProperties:
+      "^[a-z][a-z0-9-]{1,63}$":
+        type: string
+        minLength: 1
+        maxLength: 280
+
+  # ---- thresholds ----------------------------------------------------------
+  # Map of name -> value. Numeric or short string. Use for limits, cadences,
+  # and switched behaviour ("always"/"never"/"only-if-asked").
+  #
+  # Example:
+  #   thresholds:
+  #     long-command-seconds:   60
+  #     todowrite-min-steps:    3
+  #     confirm-before-push:    "always"
+  thresholds:
+    type: object
+    additionalProperties: false
+    patternProperties:
+      "^[a-z][a-z0-9-]{1,63}$":
+        oneOf:
+          - type: number
+          - type: string
+            minLength: 1
+            maxLength: 64

@@ -1,0 +1,58 @@
+meta:
+  version: 1
+  source_hash: 2cb50c8bb2f49d152a40f803e37ac38908bb6f2544711cf2ccc7bb2d3fb5dd8a
+rules:
+- id: surgical-changes
+  scope: '*'
+  directive: Every changed line must trace back to an issue or explicit user request.
+  forbid:
+  - Refactor adjacent code
+  - Reformat files you were not asked to change
+  - Tidy up code you were not asked to touch
+- id: justify-dependencies
+  scope: '*'
+  directive: Do not add dependencies without justification in the PR description; default to the Rust std library first.
+- id: pre-commit-lint
+  scope: commit
+  directive: Run `cargo fmt && cargo clippy --all-targets -- -D warnings` before every commit.
+- id: test-before-fix
+  scope: tests
+  directive: Write a failing reproduction test before fixing any bug.
+  on_violation: abort
+- id: pantry-is-private
+  scope: secrets
+  directive: Never log the contents of `~/.larder.db` or its path at any log level.
+- id: offline-only
+  scope: '*'
+  directive: Larder has no network features.
+  forbid:
+  - Use `reqwest`
+  - Use `ureq`
+  - Any HTTP or TCP client
+- id: append-only-migrations
+  scope: '*'
+  directive: SQLite migrations are append-only; never edit a past migration, add a new one.
+- id: parameterize-sql
+  scope: '*'
+  directive: Treat all CLI input as untrusted; pass values through `rusqlite` parameters, never via string concatenation.
+- id: no-unsafe-without-review
+  scope: '*'
+  directive: Do not introduce `unsafe` blocks without team review.
+- id: no-commit-generated
+  scope: commit
+  directive: Do not commit generated files.
+- id: no-direct-push-main
+  scope: git
+  directive: Do not push to `main` directly; all changes land via PR.
+transforms:
+  before-pr: 'Run `cargo test && cargo clippy --all-targets` before opening a PR.'
+  release-tagging: 'Tag releases as `v0.X.Y` and attach binaries built via `./scripts/release.sh`.'
+triggers:
+  build-release: cargo build --release
+  run-tests: cargo test
+  quick-list: cargo run -- list
+  branch-model: 'Branch off `main`; PRs squash-merge into `main`.'
+thresholds:
+  max-function-lines: 40
+  min-line-coverage-pct: 80
+  cli-latency-ms-10k-rows: 200

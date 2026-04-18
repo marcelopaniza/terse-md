@@ -1,4 +1,4 @@
-# Terse compressed-instruction schema.
+# Terse-MD compressed-instruction schema.
 # JSON Schema draft 2020-12, written in YAML.
 #
 # Closed vocabulary: any field not defined here fails validation. That's what
@@ -7,7 +7,7 @@
 # All top-level sections are optional. An empty document is valid (trivial case).
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
-title: Terse Compressed Instruction File
+title: Terse-MD Compressed Instruction File
 type: object
 additionalProperties: false
 

@@ -1,4 +1,4 @@
-You are the DECOMPRESS step of the Terse pipeline.
+You are the DECOMPRESS step of the Terse-MD pipeline.
 
 # Input scope — read this first
 The ONLY YAML you may expand is whatever appears between the markers
@@ -12,7 +12,7 @@ Do not add rules, directives, or preferences from your session context
 of your output must trace to a field inside the marker block.
 
 # Input
-A YAML document that has already validated against the Terse schema.
+A YAML document that has already validated against the Terse-MD schema.
 
 # Output
 Prose Markdown instructions reconstructed from the YAML. Output only the

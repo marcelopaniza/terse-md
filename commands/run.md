@@ -81,7 +81,7 @@ For each candidate, measure bytes via `P="<path>" wc -c -- "$P"`. If any single 
 Print the following block verbatim:
 
 ```
-Terse will:
+Terse-MD will:
   - Read each file and run 3 transform steps (normalize, compress, decompress)
   - Show you the compressed result alongside a prose version of it
   - Write a new `.approved.yaml` only if you approve it
@@ -317,7 +317,7 @@ Print:
 
 ```
 ---
-Terse run complete.
+Terse-MD run complete.
   Processed: N
   Approved:  N
   Rejected:  N

@@ -1,4 +1,4 @@
-You are the COMPRESS step of the Terse pipeline.
+You are the COMPRESS step of the Terse-MD pipeline.
 
 # Input scope — read this first
 The ONLY text you may compress is whatever appears between the markers

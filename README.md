@@ -105,6 +105,12 @@ and skips files that don't.
 - `feedback_*.md` — Claude auto-memory "feedback" type; rule + why + how-to-apply.
 - `reference_*.md` — Claude auto-memory "reference" type; pointers to URLs or systems.
 
+The `user_*.md`, `feedback_*.md`, and `reference_*.md` patterns also match
+similarly-named files outside Claude's auto-memory directory (e.g. a
+`user_guide.md` or `reference_api.md` in a docs folder). If that's not
+what you want, narrow the scan path — the patterns are filename prefixes,
+not directory-scoped.
+
 ### Skipped by default
 
 - `MEMORY.md` — the auto-memory index. Already one-liners; nothing to compress.

@@ -13,7 +13,7 @@ Parse flags and positional arguments in this order, **before touching any path o
 
 1. Tokenize `$ARGUMENTS` on whitespace. Let the token list be `{TOKENS}`.
 2. If `--dry-run` appears in `{TOKENS}`, set `{dry_run}` to `true` and remove that token from the list; otherwise `{dry_run}` is `false`.
-3. If `--include-all` appears in `{TOKENS}`, set `{include_all}` to `true` and remove that token from the list; otherwise `{include_all}` is `false`.
+3. If any token in `{TOKENS}` is exactly equal to the string `--include-all` (no prefix or suffix variation), set `{include_all}` to `true` and remove that token from the list; otherwise `{include_all}` is `false`. Substring matches like `--include-all-the-things` or `--include-all=true` do NOT count and are passed through to subsequent parsing steps (where they'll fail as bad paths).
 4. If the first remaining token is `--all`, set `{mode}` to `all` and take the second remaining token as `{raw_path}`. If no second token is present, print `Usage: /terse-md:run [<file> | --all <path>] [--dry-run] [--include-all]` and STOP. Discard any further tokens.
 5. Otherwise, if there is exactly one remaining token, set `{mode}` to `file` and take it as `{raw_path}`.
 6. Otherwise (no remaining tokens), set `{mode}` to `all` and `{raw_path}` to `.`. In this case — and only this case — print a single line `Interpreting as: /terse-md:run --all .` before continuing, so the user knows what scope was inferred.
@@ -36,7 +36,7 @@ If the result is `bad`, print `Error: <TARGET_PATH> is not a regular file (or is
 
 ## Step 2 — Discover candidate files (only when `{mode}` is `all`)
 
-Skip this step if `{mode}` is `file`; set the candidate list to `[{TARGET_PATH}]` and set `{SKIPPED_BY_DEFAULT}` to empty. (Explicit `file` mode bypasses the default-skip filter — if you name a file directly, Terse-MD trusts you.)
+Skip this step if `{mode}` is `file`; set the candidate list to `[{TARGET_PATH}]` and set `{SKIPPED_BY_DEFAULT}` to empty. (Explicit `file` mode bypasses the default-skip filter — if you name a file directly, Terse-MD trusts you. If `{include_all}` is also `true` in this case, it has no effect; print one line `Note: --include-all has no effect in file mode (the default-skip filter is already bypassed).` once after parsing, then continue.)
 
 Use the Glob tool to find files matching each of these patterns under `{TARGET_PATH}`:
 - `**/CLAUDE.md`
@@ -77,11 +77,13 @@ Unless `{include_all}` is `true`, partition the remaining files into the candida
 - Exactly `MEMORY.md` — reason: `index file; already one-liners`.
 - Matches the shell glob `project_*.md` — reason: `narrative scratchpad; short half-life`.
 
+Both checks are **case-sensitive on the basename**. `Project_foo.md`, `MEMORY.MD`, and `memory.md` are NOT default-skipped; only the exact-case forms shown above match.
+
 All other files stay in the candidate list.
 
-If `{include_all}` is `true`, the candidate list is everything that survived the Step 2 filters and `{SKIPPED_BY_DEFAULT}` is empty.
+If `{include_all}` is `true`, the candidate list is everything that survived the discover + filter pass earlier in Step 2 and `{SKIPPED_BY_DEFAULT}` is empty.
 
-If the candidate list is empty, print `No candidate files under {TARGET_PATH}.` (and if `{SKIPPED_BY_DEFAULT}` is non-empty, append `{N} file(s) skipped by default — re-run with --include-all to include.`). Then STOP.
+If the candidate list is empty, print `No candidate files under {TARGET_PATH}.` (with the resolved path wrapped in backticks). If `{SKIPPED_BY_DEFAULT}` is non-empty, let `{SKIP_COUNT}` be the count of `{SKIPPED_BY_DEFAULT}` and append a second line: `{SKIP_COUNT} file(s) skipped by default — re-run with --include-all to include.` (substituting the literal count). Then STOP.
 
 Sort the candidate list alphabetically by absolute path.
 
@@ -93,7 +95,7 @@ For each candidate, measure bytes via `P="<path>" wc -c -- "$P"`. If any single 
 
 ## Step 4 — First-run message (once per invocation, before the first file)
 
-If `{mode}` is `all` and `{SKIPPED_BY_DEFAULT}` is non-empty, print this block first (before the main message):
+If `{mode}` is `all` and `{SKIPPED_BY_DEFAULT}` is non-empty, print this block first (before the main message), then a blank line:
 
 ```
 Skipped by default (re-run with --include-all to include):
@@ -101,7 +103,9 @@ Skipped by default (re-run with --include-all to include):
   ...
 ```
 
-Reasons: `MEMORY.md` → `index file; already one-liners`. `project_*.md` → `narrative scratchpad; short half-life`.
+Before printing any path, **sanitize the displayed string**: replace any byte less than `0x20` or equal to `0x7f` with the literal character `?`. This prevents a filename containing control characters (e.g. `\r`, `\n`, ANSI escape sequences) from rewriting earlier lines or forging fake entries in the rendered block. Sanitization is display-only; the actual path used internally is unchanged.
+
+Indent each entry by 2 spaces. Left-align the sanitized paths in a single column; pad each with spaces so the reason column begins 2 spaces past the longest path in this block. Reasons: `MEMORY.md` → `index file; already one-liners`. `project_*.md` → `narrative scratchpad; short half-life`.
 
 Then print the following block verbatim:
 

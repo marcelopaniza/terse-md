@@ -11,7 +11,7 @@ The user invoked this command with: $ARGUMENTS
 
 Tokenize `$ARGUMENTS` on whitespace. Let the token list be `{TOKENS}`.
 
-If `--include-all` appears in `{TOKENS}`, set `{include_all}` to `true` and remove that token from the list; otherwise `{include_all}` is `false`.
+If any token in `{TOKENS}` is exactly equal to the string `--include-all` (no prefix or suffix variation), set `{include_all}` to `true` and remove that token from the list; otherwise `{include_all}` is `false`. Substring matches like `--include-all-the-things` or `--include-all=true` do NOT count and are passed through to the path-parsing step (where they'll fail as bad paths).
 
 Parse `{path}` from the remaining tokens. If none remain, default to `.`. If more than one remains, print `Usage: /terse-md:analyze [<path>] [--include-all]` and STOP.
 
@@ -64,11 +64,15 @@ Unless `{include_all}` is `true`, partition the remaining files into `{CANDIDATE
 - Exactly `MEMORY.md` — reason: `index file; already one-liners`.
 - Matches the shell glob `project_*.md` — reason: `narrative scratchpad; short half-life`.
 
+Both checks are **case-sensitive on the basename**. `Project_foo.md`, `MEMORY.MD`, and `memory.md` are NOT default-skipped; only the exact-case forms shown above match.
+
 All other files go to `{CANDIDATES}`.
 
 If `{include_all}` is `true`, `{CANDIDATES}` holds every remaining file and `{SKIPPED_BY_DEFAULT}` is empty.
 
-If both `{CANDIDATES}` and `{SKIPPED_BY_DEFAULT}` are empty, print "No candidate files under `{SCAN_ROOT}`." and STOP. If `{CANDIDATES}` is empty but `{SKIPPED_BY_DEFAULT}` is not, print `All N files under {SCAN_ROOT} are skipped by default (project_*.md or MEMORY.md). Re-run with --include-all to override.` and STOP.
+If both `{CANDIDATES}` and `{SKIPPED_BY_DEFAULT}` are empty, print `No candidate files under {SCAN_ROOT}.` (with the resolved path wrapped in backticks) and STOP.
+
+If `{CANDIDATES}` is empty but `{SKIPPED_BY_DEFAULT}` is not, let `{SKIP_COUNT}` be the count of `{SKIPPED_BY_DEFAULT}` and print `All {SKIP_COUNT} file(s) under {SCAN_ROOT} are skipped by default (project_*.md or MEMORY.md). Re-run with --include-all to override.` (substituting the literal count and resolved path) and STOP.
 
 ## Step 3 — Size and count caps
 
@@ -88,7 +92,7 @@ Sum all estimated tokens across all remaining files in `{CANDIDATES}` as `{TOTAL
 
 ## Step 4 — Identify the largest file
 
-Sort the remaining files in `{CANDIDATES}` by `bytes` descending. The first entry is `{SAMPLE_FILE}`. If `{CANDIDATES}` is empty after the 1 MiB cap filter in Step 3, skip Steps 5–10 and go straight to Step 11 (report the skipped-default block without a sample-compression line).
+Sort the remaining files in `{CANDIDATES}` by `bytes` descending. The first entry is `{SAMPLE_FILE}`. If `{CANDIDATES}` is empty after the 1 MiB cap filter in Step 3, skip Steps 5–10 and go straight to Step 11 (report whichever blocks have content — skipped-by-default and/or skipped-by-1-MiB — without a sample-compression line). If both `{CANDIDATES}` and `{SKIPPED_BY_DEFAULT}` are empty after Step 3 but the 1-MiB-skipped list is non-empty, still proceed to Step 11 to surface the 1-MiB-skipped block.
 
 ## Step 5 — Create an isolated work directory
 
@@ -200,13 +204,15 @@ Next: /terse-md:run --all <SCAN_ROOT>  or  /terse-md:run <file>
   - `MEMORY.md` files → `index file; already one-liners`
   - `project_*.md` files → `narrative scratchpad; short half-life`
 
-  Example:
+  Before printing any path, **sanitize the displayed string**: replace any byte less than `0x20` or equal to `0x7f` with the literal character `?`. This prevents a filename containing control characters (e.g. `\r`, `\n`, ANSI escape sequences) from rewriting earlier lines or forging fake entries in the rendered report. Sanitization is display-only; the actual path used internally is unchanged.
+
+  Indent each entry by 2 spaces. Left-align the sanitized paths in a single column; pad each with spaces so the reason column begins 2 spaces past the longest path in this block. Example:
   ```
   Skipped by default (re-run with --include-all to include):
-    MEMORY.md                           index file; already one-liners
-    project_foo_20260419.md             narrative scratchpad; short half-life
+    MEMORY.md                index file; already one-liners
+    project_foo_20260419.md  narrative scratchpad; short half-life
   ```
-- If `{CANDIDATES}` was empty (Step 4 skipped the sample), omit the `Sample compression` and `Estimated total` lines and the `Top candidates by size:` block; still print the `Scanned N files, X,XXX tokens total.` header (with `N=0, X=0`) and the `Skipped by default` block.
+- If `{CANDIDATES}` was empty (Step 4 skipped the sample), omit the `Sample compression` and `Estimated total` lines and the `Top candidates by size:` block; still print the `Scanned N files, X,XXX tokens total.` header (with `N=0, X=0`), then whichever of the `Skipped by default` and `Skipped (>1 MiB):` blocks have content. At least one will, given Step 4 only routes here when something was skipped somewhere.
 
 ## Step 12 — Cleanup
 

@@ -7,9 +7,17 @@ Compress Claude instruction files. Verified lossless by meaning, not by wording.
 Terse-MD is a Claude Code plugin that compresses human-written Markdown
 instruction files (`CLAUDE.md`, memory files, `SKILL.md`) into dense YAML
 conforming to a closed schema. The YAML is what Claude loads on subsequent
-sessions — typically 50–70% fewer tokens than the source prose. Compression
-is verified by round-tripping the YAML back to prose and asking you to
-approve the reconstruction. Wording will shift. Meaning should not.
+sessions. Compression is verified by round-tripping the YAML back to prose
+and asking you to approve the reconstruction. Wording will shift. Meaning
+should not — but see **[The honest caveats](#the-honest-caveats)** below,
+because meaning *can* drift, and the whole design assumes you'll catch it.
+
+Compression ratios vary by content shape. Rule-heavy files (CLAUDE.md,
+SKILL.md, feedback memories shaped as "rule + why + how-to-apply") can
+see 50–70% reduction. Reference files with paths/facts/rationale typically
+see 15–25% at best, and they lose meaningful context in the process.
+Short files (<300 tokens) may not shrink at all — the YAML scaffolding
+costs more than the prose you're compressing.
 
 ## Requirements
 
@@ -99,17 +107,33 @@ and skips files that don't.
 
 ### Good fits (picked up by default)
 
-- `CLAUDE.md` — global or project instructions; stable, high re-read frequency.
-- `SKILL.md` — skill definitions; stable once written.
-- `user_*.md` — Claude auto-memory "user" type; role/expertise/preferences.
-- `feedback_*.md` — Claude auto-memory "feedback" type; rule + why + how-to-apply.
-- `reference_*.md` — Claude auto-memory "reference" type; pointers to URLs or systems.
+- `CLAUDE.md` — global or project instructions. High re-read frequency
+  (loaded every session), rule-shaped content, long-lived. Compression
+  costs amortize over hundreds of reads. **This is the target Terse-MD
+  was designed for.**
+- `SKILL.md` — skill definitions. Similar shape and lifetime.
+- `feedback_*.md` — Claude auto-memory "feedback" type. Already shaped
+  as "rule + why + how-to-apply" which maps cleanly to the schema.
 
 The `user_*.md`, `feedback_*.md`, and `reference_*.md` patterns also match
 similarly-named files outside Claude's auto-memory directory (e.g. a
 `user_guide.md` or `reference_api.md` in a docs folder). If that's not
 what you want, narrow the scan path — the patterns are filename prefixes,
 not directory-scoped.
+
+### Weak fits (picked up but drift is likely)
+
+- `reference_*.md` — reference material with paths, URLs, facts, and
+  rationale. The closed schema has rules/transforms/triggers/thresholds
+  but no native "fact" or "context" bucket, so standalone paths and
+  "why this exclusion matters" explanations tend to get dropped or
+  folded into rule directives. Expect 15–25% size reduction and
+  meaningful context loss. **Read the review carefully.** Probably not
+  worth compressing unless the file is very large and very stable.
+- `user_*.md` — a single user-profile memory. If it's short and mostly
+  facts (role, preferences, expertise), you'll save <200 tokens and the
+  YAML overhead eats most of that. Compress only if the file is large
+  and rule-heavy.
 
 ### Skipped by default
 
@@ -133,6 +157,58 @@ found, pass `--include-all` to either command:
 Naming a single file explicitly with `/terse-md:run <path>` always bypasses
 the default-skip filter — if you point Terse-MD at a specific file, it
 trusts you.
+
+## The honest caveats
+
+Read this before you run `/terse-md:run` on anything you care about.
+
+### 1. The approval step is the entire safety model. Don't click through.
+
+Terse-MD's promise of "lossless by meaning" is **not** a mechanical
+guarantee — it's a human-approved guarantee. The tool compresses, then
+decompresses, then shows you the original next to the reconstruction and
+asks if meaning survived. If you click **Approve** without reading the
+diff, you have bypassed the only thing that keeps drift out of your
+compressed file.
+
+This matters because **Claude will follow the drifted version on every
+future session.** If the reconstruction dropped a rationale, a path, a
+"why we do X", that context is now gone from what Claude sees. You may
+not notice until Claude starts making choices you thought it wouldn't.
+
+If you're tempted to approve reflexively because the diff is long: that's
+the exact moment the tool is asking you to do its most important job.
+Reject and edit the source to fit the schema better, or don't compress
+that file.
+
+### 2. Compression ratios vary more than "50–70%" suggests.
+
+That number applies to rule-heavy CLAUDE.md-shaped files. Real ranges
+I've seen in testing:
+
+| Content shape                               | Typical savings |
+|---------------------------------------------|-----------------|
+| CLAUDE.md with many behavioural rules       | 50–70%          |
+| feedback memory (rule + why + how-to-apply) | 40–60%          |
+| Short reference memory (<500 tokens)        | 15–25%          |
+| Dense reference with inline commands        | 20–30% with meaningful context loss |
+| Very short files (<200 tokens)              | near zero or negative — YAML overhead |
+
+### 3. The compression pipeline is not free.
+
+Each file burns ~60k tokens of subagent context (3 Sonnet calls: normalize,
+compress, decompress). A file has to be re-read many times to amortize that
+cost. CLAUDE.md easily does (read every session × hundreds of sessions).
+Individual feedback memories probably don't. Run `/terse-md:analyze` first
+and think about re-read frequency before compressing a whole directory.
+
+### 4. The closed schema is opinionated.
+
+The schema has `rules`, `transforms`, `triggers`, `thresholds`, and `meta`
+— five sections chosen for *behavioural instructions*. Reference material
+(facts, paths, URLs, "here's the state of the world") fits awkwardly.
+When in doubt, either: (a) rewrite the source into imperative rule shape
+before compressing, or (b) don't compress that file.
 
 ## How it works
 

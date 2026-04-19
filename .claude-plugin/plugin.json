@@ -1,7 +1,7 @@
 {
   "name": "terse-md",
   "description": "Compress Claude instruction files (CLAUDE.md, memory files, SKILL.md) into denser YAML. Verified lossless by meaning via round-trip review. Runs inside Claude Code; no API key required.",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "author": {
     "name": "Marcelo Paniza",
     "url": "https://github.com/marcelopaniza"

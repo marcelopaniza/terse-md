@@ -1,12 +1,16 @@
 {
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "marcelopaniza-terse-md",
+  "description": "Compress Claude instruction files (CLAUDE.md, SKILL.md, auto-memory) into closed-schema YAML — verified lossless by meaning, not wording.",
   "owner": {
     "name": "Marcelo Paniza"
   },
   "plugins": [
     {
       "name": "terse-md",
-      "source": "."
+      "source": "./",
+      "description": "Compress Claude instruction Markdown into closed-schema YAML with round-trip review.",
+      "category": "productivity"
     }
   ]
 }

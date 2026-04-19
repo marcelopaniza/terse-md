@@ -56,16 +56,19 @@ real compression on the largest file, and prints projected savings. Writes
 nothing.
 
 ```
-Scanned 3 files, 4,200 tokens total.
+Scanned 4 files, 3,700 tokens total.
 Sample compression on examples/larder_claude.source.md: 1,700 → 600 tokens (65% saved).
-Estimated total after compression: ~1,500 tokens.
+Estimated total after compression: ~1,300 tokens.
 
 Top candidates by size:
   1. examples/larder_claude.source.md    1,700 tokens
   2. docs/SKILL.md                         900 tokens
   3. CLAUDE.md                             800 tokens
-  4. memory/project_foo.md                 500 tokens
-  5. memory/feedback_bar.md                300 tokens
+  4. memory/feedback_bar.md                300 tokens
+
+Skipped by default (re-run with --include-all to include):
+  MEMORY.md                  index file; already one-liners
+  memory/project_foo.md      narrative scratchpad; short half-life
 
 Next: `/terse-md:run --all .` or `/terse-md:run <file>`
 ```
@@ -86,6 +89,44 @@ writes the `.approved.yaml` file.
 Idempotence check. Runs the pipeline twice with fresh subagents, canonicalizes
 both YAMLs (sorted keys, JSON form), and diffs them. Passes if identical.
 Useful after changing prompts or schema.
+
+## Which files to compress
+
+Terse-MD's closed schema works best on files that are **stable** (you don't
+edit them weekly) and **structured** (rules, facts, pointers — not flowing
+narrative). By default, Terse-MD picks up files likely to fit that profile
+and skips files that don't.
+
+### Good fits (picked up by default)
+
+- `CLAUDE.md` — global or project instructions; stable, high re-read frequency.
+- `SKILL.md` — skill definitions; stable once written.
+- `user_*.md` — Claude auto-memory "user" type; role/expertise/preferences.
+- `feedback_*.md` — Claude auto-memory "feedback" type; rule + why + how-to-apply.
+- `reference_*.md` — Claude auto-memory "reference" type; pointers to URLs or systems.
+
+### Skipped by default
+
+- `MEMORY.md` — the auto-memory index. Already one-liners; nothing to compress.
+- `project_*.md` — Claude auto-memory "project" type. These are narrative
+  scratchpads with SHAs, version tags, TODO markers ("PICK UP HERE",
+  "LANDED"), file paths, and mid-task edits. They decay fast (many are
+  archived or deleted within days). Compressing then discarding is wasted
+  effort, and the closed schema fights their loose narrative shape.
+
+### Override
+
+If you know what you're doing and want to compress everything Terse-MD
+found, pass `--include-all` to either command:
+
+```
+/terse-md:analyze ~/.claude/projects/-mnt-data-game2/memory --include-all
+/terse-md:run --all ~/.claude/projects/-mnt-data-game2/memory --include-all
+```
+
+Naming a single file explicitly with `/terse-md:run <path>` always bypasses
+the default-skip filter — if you point Terse-MD at a specific file, it
+trusts you.
 
 ## How it works
 

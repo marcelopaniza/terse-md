@@ -1,6 +1,6 @@
 ---
 description: Compress a Markdown instruction file to validated YAML with round-trip review.
-argument-hint: [<file> | --all <path>] [--dry-run]
+argument-hint: [<file> | --all <path>] [--dry-run] [--include-all]
 ---
 
 Compress one or more Markdown instruction files through the Terse-MD pipeline (normalize → compress → validate → decompress → human review). Write `.approved.yaml` only on explicit approval.
@@ -13,9 +13,10 @@ Parse flags and positional arguments in this order, **before touching any path o
 
 1. Tokenize `$ARGUMENTS` on whitespace. Let the token list be `{TOKENS}`.
 2. If `--dry-run` appears in `{TOKENS}`, set `{dry_run}` to `true` and remove that token from the list; otherwise `{dry_run}` is `false`.
-3. If the first remaining token is `--all`, set `{mode}` to `all` and take the second remaining token as `{raw_path}`. If no second token is present, print `Usage: /terse-md:run [<file> | --all <path>] [--dry-run]` and STOP. Discard any further tokens.
-4. Otherwise, if there is exactly one remaining token, set `{mode}` to `file` and take it as `{raw_path}`.
-5. Otherwise (no remaining tokens), set `{mode}` to `all` and `{raw_path}` to `.`. In this case — and only this case — print a single line `Interpreting as: /terse-md:run --all .` before continuing, so the user knows what scope was inferred.
+3. If `--include-all` appears in `{TOKENS}`, set `{include_all}` to `true` and remove that token from the list; otherwise `{include_all}` is `false`.
+4. If the first remaining token is `--all`, set `{mode}` to `all` and take the second remaining token as `{raw_path}`. If no second token is present, print `Usage: /terse-md:run [<file> | --all <path>] [--dry-run] [--include-all]` and STOP. Discard any further tokens.
+5. Otherwise, if there is exactly one remaining token, set `{mode}` to `file` and take it as `{raw_path}`.
+6. Otherwise (no remaining tokens), set `{mode}` to `all` and `{raw_path}` to `.`. In this case — and only this case — print a single line `Interpreting as: /terse-md:run --all .` before continuing, so the user knows what scope was inferred.
 
 Only **after** parsing, resolve `{raw_path}` to an absolute path, passing it via env var to avoid shell metacharacter injection:
 
@@ -35,13 +36,16 @@ If the result is `bad`, print `Error: <TARGET_PATH> is not a regular file (or is
 
 ## Step 2 — Discover candidate files (only when `{mode}` is `all`)
 
-Skip this step if `{mode}` is `file`; set the candidate list to `[{TARGET_PATH}]`.
+Skip this step if `{mode}` is `file`; set the candidate list to `[{TARGET_PATH}]` and set `{SKIPPED_BY_DEFAULT}` to empty. (Explicit `file` mode bypasses the default-skip filter — if you name a file directly, Terse-MD trusts you.)
 
 Use the Glob tool to find files matching each of these patterns under `{TARGET_PATH}`:
 - `**/CLAUDE.md`
 - `**/SKILL.md`
-- `**/memory*.md`
-- `**/MEMORY*.md`
+- `**/user_*.md`
+- `**/feedback_*.md`
+- `**/reference_*.md`
+- `**/project_*.md`
+- `**/MEMORY.md`
 
 Combine all results and deduplicate by absolute path.
 
@@ -66,9 +70,20 @@ Filter out:
 
 This plugin does not interpret `.gitignore` globs. If you want a path excluded, don't include it under `{TARGET_PATH}`.
 
-If the list is empty, print "No candidate files under `{TARGET_PATH}`." and STOP.
+### Step 2a — Default-skip filter (only when `{mode}` is `all`)
 
-Sort the list alphabetically by absolute path.
+Unless `{include_all}` is `true`, partition the remaining files into the candidate list and `{SKIPPED_BY_DEFAULT}`. A file goes to `{SKIPPED_BY_DEFAULT}` if its basename matches either:
+
+- Exactly `MEMORY.md` — reason: `index file; already one-liners`.
+- Matches the shell glob `project_*.md` — reason: `narrative scratchpad; short half-life`.
+
+All other files stay in the candidate list.
+
+If `{include_all}` is `true`, the candidate list is everything that survived the Step 2 filters and `{SKIPPED_BY_DEFAULT}` is empty.
+
+If the candidate list is empty, print `No candidate files under {TARGET_PATH}.` (and if `{SKIPPED_BY_DEFAULT}` is non-empty, append `{N} file(s) skipped by default — re-run with --include-all to include.`). Then STOP.
+
+Sort the candidate list alphabetically by absolute path.
 
 ## Step 3 — Size and count caps
 
@@ -78,7 +93,17 @@ For each candidate, measure bytes via `P="<path>" wc -c -- "$P"`. If any single 
 
 ## Step 4 — First-run message (once per invocation, before the first file)
 
-Print the following block verbatim:
+If `{mode}` is `all` and `{SKIPPED_BY_DEFAULT}` is non-empty, print this block first (before the main message):
+
+```
+Skipped by default (re-run with --include-all to include):
+  <path-relative-to-TARGET_PATH>    <reason>
+  ...
+```
+
+Reasons: `MEMORY.md` → `index file; already one-liners`. `project_*.md` → `narrative scratchpad; short half-life`.
+
+Then print the following block verbatim:
 
 ```
 Terse-MD will:

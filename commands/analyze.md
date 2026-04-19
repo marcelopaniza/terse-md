@@ -1,6 +1,6 @@
 ---
 description: Scan instruction files under a path, count tokens, sample-compress the largest file, report estimated savings. Writes nothing.
-argument-hint: [<path>]
+argument-hint: [<path>] [--include-all]
 ---
 
 Scan candidate instruction files under a path, estimate token counts, run one real compression on the largest file, and report projected savings. Writes nothing to disk.
@@ -9,7 +9,13 @@ Scan candidate instruction files under a path, estimate token counts, run one re
 
 The user invoked this command with: $ARGUMENTS
 
-Parse `{path}` from `$ARGUMENTS`. If `$ARGUMENTS` is empty, default to `.`. Resolve to an absolute path via Bash, passing the path through an environment variable to avoid any shell metacharacter injection:
+Tokenize `$ARGUMENTS` on whitespace. Let the token list be `{TOKENS}`.
+
+If `--include-all` appears in `{TOKENS}`, set `{include_all}` to `true` and remove that token from the list; otherwise `{include_all}` is `false`.
+
+Parse `{path}` from the remaining tokens. If none remain, default to `.`. If more than one remains, print `Usage: /terse-md:analyze [<path>] [--include-all]` and STOP.
+
+Resolve `{path}` to an absolute path via Bash, passing the path through an environment variable to avoid any shell metacharacter injection:
 
 ```bash
 P="<path>" realpath -- "$P"
@@ -22,8 +28,11 @@ Store the resolved path as `{SCAN_ROOT}`.
 Use the Glob tool to find files matching each of these patterns under `{SCAN_ROOT}`:
 - `**/CLAUDE.md`
 - `**/SKILL.md`
-- `**/memory*.md`
-- `**/MEMORY*.md`
+- `**/user_*.md`
+- `**/feedback_*.md`
+- `**/reference_*.md`
+- `**/project_*.md`
+- `**/MEMORY.md`
 
 Combine all results and deduplicate by absolute path (one absolute path appears at most once in the final candidate list).
 
@@ -48,27 +57,38 @@ Filter out:
 
 This plugin does not interpret `.gitignore` globs. If you want a path excluded, don't include it under `{SCAN_ROOT}`.
 
-If no files are found, print "No candidate files under `{SCAN_ROOT}`." and STOP.
+### Step 2a — Default-skip filter
+
+Unless `{include_all}` is `true`, partition the remaining files into `{CANDIDATES}` (to analyze) and `{SKIPPED_BY_DEFAULT}` (reported but not compressed). A file goes to `{SKIPPED_BY_DEFAULT}` if its basename matches either:
+
+- Exactly `MEMORY.md` — reason: `index file; already one-liners`.
+- Matches the shell glob `project_*.md` — reason: `narrative scratchpad; short half-life`.
+
+All other files go to `{CANDIDATES}`.
+
+If `{include_all}` is `true`, `{CANDIDATES}` holds every remaining file and `{SKIPPED_BY_DEFAULT}` is empty.
+
+If both `{CANDIDATES}` and `{SKIPPED_BY_DEFAULT}` are empty, print "No candidate files under `{SCAN_ROOT}`." and STOP. If `{CANDIDATES}` is empty but `{SKIPPED_BY_DEFAULT}` is not, print `All N files under {SCAN_ROOT} are skipped by default (project_*.md or MEMORY.md). Re-run with --include-all to override.` and STOP.
 
 ## Step 3 — Size and count caps
 
-Count the candidate files. If the count exceeds **100**, print a message with the real count and the resolved scan root — for example: `Refusing to scan 247 candidate files under /home/me/project — exceeds the 100-file cap. Narrow the scan path and retry.` Then STOP.
+Count the files in `{CANDIDATES}`. If the count exceeds **100**, print a message with the real count and the resolved scan root — for example: `Refusing to scan 247 candidate files under /home/me/project — exceeds the 100-file cap. Narrow the scan path and retry.` Then STOP.
 
-For each candidate file, measure byte count via Bash, passing the path through an env var:
+For each file in `{CANDIDATES}`, measure byte count via Bash, passing the path through an env var:
 
 ```bash
 P="<absolute-path>" wc -c -- "$P"
 ```
 
-If any single file exceeds **1,048,576 bytes (1 MiB)**, exclude it from the candidate list and note it in the final report as `(skipped: {N} bytes exceeds 1 MiB cap)`.
+If any single file exceeds **1,048,576 bytes (1 MiB)**, exclude it from `{CANDIDATES}` and note it in the final report as `(skipped: {N} bytes exceeds 1 MiB cap)`.
 
 Compute estimated tokens per remaining file: `round(bytes / 3.5)`, rounded to the nearest 100. Record `{path, bytes, est_tokens}` for every file.
 
-Sum all estimated tokens across all remaining candidates as `{TOTAL_TOKENS}`.
+Sum all estimated tokens across all remaining files in `{CANDIDATES}` as `{TOTAL_TOKENS}`. (Files in `{SKIPPED_BY_DEFAULT}` are not measured or summed.)
 
 ## Step 4 — Identify the largest file
 
-Sort the remaining candidates by `bytes` descending. The first entry is `{SAMPLE_FILE}`.
+Sort the remaining files in `{CANDIDATES}` by `bytes` descending. The first entry is `{SAMPLE_FILE}`. If `{CANDIDATES}` is empty after the 1 MiB cap filter in Step 3, skip Steps 5–10 and go straight to Step 11 (report the skipped-default block without a sample-compression line).
 
 ## Step 5 — Create an isolated work directory
 
@@ -176,6 +196,17 @@ Next: /terse-md:run --all <SCAN_ROOT>  or  /terse-md:run <file>
 - `<filename>` in the sample line is the basename only; the top-candidates list uses paths relative to `{SCAN_ROOT}`.
 - If validation failed in Step 8, append `(validation failed)` after the sample compression line.
 - If any files were skipped for exceeding the 1 MiB cap, append a `Skipped (>1 MiB):` block listing each.
+- If `{SKIPPED_BY_DEFAULT}` is non-empty, append a block titled `Skipped by default (re-run with --include-all to include):` listing each path relative to `{SCAN_ROOT}` followed by its one-line reason:
+  - `MEMORY.md` files → `index file; already one-liners`
+  - `project_*.md` files → `narrative scratchpad; short half-life`
+
+  Example:
+  ```
+  Skipped by default (re-run with --include-all to include):
+    MEMORY.md                           index file; already one-liners
+    project_foo_20260419.md             narrative scratchpad; short half-life
+  ```
+- If `{CANDIDATES}` was empty (Step 4 skipped the sample), omit the `Sample compression` and `Estimated total` lines and the `Top candidates by size:` block; still print the `Scanned N files, X,XXX tokens total.` header (with `N=0, X=0`) and the `Skipped by default` block.
 
 ## Step 12 — Cleanup
 

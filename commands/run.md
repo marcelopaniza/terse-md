@@ -156,7 +156,7 @@ For each file in the candidate list (index `i`, starting at 1), run steps 6a–6
 Read the file content via the Read tool. Store it as `{SOURCE}`. Then run exactly one Bash call:
 
 ```bash
-P="<absolute-path>" sha256sum -- "$P" | awk '{print $1}'
+P="<absolute-path>" sha256sum -- "$P" | head -c 64
 ```
 
 Capture the output as `{SOURCE_HASH}`.

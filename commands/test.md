@@ -34,7 +34,7 @@ Read `{SOURCE_PATH}` via the Read tool. Store as `{SOURCE}`.
 Run one Bash call to hash the file:
 
 ```bash
-P="<SOURCE_PATH>" sha256sum -- "$P" | awk '{print $1}'
+P="<SOURCE_PATH>" sha256sum -- "$P" | head -c 64
 ```
 
 Capture as `{SOURCE_HASH}`.

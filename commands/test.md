@@ -14,7 +14,7 @@ Parse `{file}` from `$ARGUMENTS`. `{file}` is required. If `$ARGUMENTS` is empty
 Resolve to an absolute path, passing the path through an environment variable:
 
 ```bash
-P="<file>" realpath -- "$P"
+P="<file>" bash -c 'realpath -- "$P"'
 ```
 
 Store as `{SOURCE_PATH}`.
@@ -34,7 +34,7 @@ Read `{SOURCE_PATH}` via the Read tool. Store as `{SOURCE}`.
 Run one Bash call to hash the file:
 
 ```bash
-P="<SOURCE_PATH>" sha256sum -- "$P" | head -c 64
+P="<SOURCE_PATH>" bash -c 'sha256sum -- "$P" | head -c 64'
 ```
 
 Capture as `{SOURCE_HASH}`.

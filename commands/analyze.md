@@ -18,7 +18,7 @@ Parse `{path}` from the remaining tokens. If none remain, default to `.`. If mor
 Resolve `{path}` to an absolute path via Bash, passing the path through an environment variable to avoid any shell metacharacter injection:
 
 ```bash
-P="<path>" realpath -- "$P"
+P="<path>" bash -c 'realpath -- "$P"'
 ```
 
 Store the resolved path as `{SCAN_ROOT}`.
@@ -81,7 +81,7 @@ Count the files in `{CANDIDATES}`. If the count exceeds **250**, print a message
 For each file in `{CANDIDATES}`, measure byte count via Bash, passing the path through an env var:
 
 ```bash
-P="<absolute-path>" wc -c -- "$P"
+P="<absolute-path>" bash -c 'wc -c -- "$P"'
 ```
 
 If any single file exceeds **1,048,576 bytes (1 MiB)**, exclude it from `{CANDIDATES}` and note it in the final report as `(skipped: {N} bytes exceeds 1 MiB cap)`.

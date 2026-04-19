@@ -21,7 +21,7 @@ Parse flags and positional arguments in this order, **before touching any path o
 Only **after** parsing, resolve `{raw_path}` to an absolute path, passing it via env var to avoid shell metacharacter injection:
 
 ```bash
-P="<raw_path>" realpath -- "$P"
+P="<raw_path>" bash -c 'realpath -- "$P"'
 ```
 
 Store the resolved path as `{TARGET_PATH}`.
@@ -91,7 +91,7 @@ Sort the candidate list alphabetically by absolute path.
 
 Count the candidate files. If the count exceeds **250**, print the count and a message saying `Refusing to process more than 250 files in a single run; narrow the path and retry.` and STOP.
 
-For each candidate, measure bytes via `P="<path>" wc -c -- "$P"`. If any single file exceeds **1,048,576 bytes (1 MiB)**, skip that file and note it in the final summary.
+For each candidate, measure bytes via `P="<path>" bash -c 'wc -c -- "$P"'`. If any single file exceeds **1,048,576 bytes (1 MiB)**, skip that file and note it in the final summary.
 
 ## Step 4 — First-run message (once per invocation, before the first file)
 
@@ -156,7 +156,7 @@ For each file in the candidate list (index `i`, starting at 1), run steps 6a–6
 Read the file content via the Read tool. Store it as `{SOURCE}`. Then run exactly one Bash call:
 
 ```bash
-P="<absolute-path>" sha256sum -- "$P" | head -c 64
+P="<absolute-path>" bash -c 'sha256sum -- "$P" | head -c 64'
 ```
 
 Capture the output as `{SOURCE_HASH}`.

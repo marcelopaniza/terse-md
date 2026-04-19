@@ -49,7 +49,13 @@ in the schema fails validation):
   happens when the rule is broken.
 
 - Task-shape restatements ("Add X → When condition, system does behavior")
-  → `transforms` map.
+  → `transforms` map. **`transforms` is also the home for verbatim commands,
+  one-liner scripts, code blobs, or any string longer than ~250 chars** —
+  its `maxLength` is 2000 vs. 280 elsewhere in the schema. When a source
+  contains a long shell command, SQL query, curl invocation, or template,
+  put the verbatim text in `transforms.<kebab-name>` and use `directive:`
+  in a related `rules[]` entry to summarize what it does ("Run the working
+  backup command (see transforms.backup-cmd) before every major change.").
 
 - Event → action guidance ("before running destructive ops, confirm")
   → `triggers` map. Action may be a plain directive or `rule:<id>` to point

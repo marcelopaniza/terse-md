@@ -94,7 +94,10 @@ properties:
       "^[a-z][a-z0-9-]{1,63}$":
         type: string
         minLength: 1
-        maxLength: 280
+        # Larger than other string fields (280) because transforms is the
+        # designated home for verbatim commands, code blobs, and templates
+        # that often exceed a one-sentence directive.
+        maxLength: 2000
 
   # ---- triggers ------------------------------------------------------------
   # Map of event -> action. When {event} happens, do {action}. Events are

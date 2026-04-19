@@ -89,7 +89,7 @@ Sort the candidate list alphabetically by absolute path.
 
 ## Step 3 — Size and count caps
 
-Count the candidate files. If the count exceeds **100**, print the count and a message saying `Refusing to process more than 100 files in a single run; narrow the path and retry.` and STOP.
+Count the candidate files. If the count exceeds **250**, print the count and a message saying `Refusing to process more than 250 files in a single run; narrow the path and retry.` and STOP.
 
 For each candidate, measure bytes via `P="<path>" wc -c -- "$P"`. If any single file exceeds **1,048,576 bytes (1 MiB)**, skip that file and note it in the final summary.
 
@@ -106,6 +106,8 @@ Skipped by default (re-run with --include-all to include):
 Before printing any path, **sanitize the displayed string**: replace any byte less than `0x20` or equal to `0x7f` with the literal character `?`. This prevents a filename containing control characters (e.g. `\r`, `\n`, ANSI escape sequences) from rewriting earlier lines or forging fake entries in the rendered block. Sanitization is display-only; the actual path used internally is unchanged.
 
 Indent each entry by 2 spaces. Left-align the sanitized paths in a single column; pad each with spaces so the reason column begins 2 spaces past the longest path in this block. Reasons: `MEMORY.md` → `index file; already one-liners`. `project_*.md` → `narrative scratchpad; short half-life`.
+
+**Cap:** if `{SKIPPED_BY_DEFAULT}` contains more than **10** files, print only the first 10 (sorted alphabetically) and append a final summary line in the same indent: `(... and {EXTRA} more — {project_count} project_*.md, {memory_count} MEMORY.md)` where `{EXTRA}` = total minus 10, and the per-type counts are over ALL skipped files (not just the omitted tail). Keeps the prompt readable for auto-memory directories that may default-skip 100+ project files.
 
 Then print the following block verbatim:
 
@@ -376,4 +378,4 @@ rm -rf -- "<WORK_DIR>"
 - Do not pass the `{SOURCE_HASH}` to the compress subagent — inject it after validation in Step 6f.
 - In dry-run mode, print what would be written but write nothing to disk.
 - Files larger than 1 MiB are skipped in Step 3.
-- No more than 100 files per invocation.
+- No more than 250 files per invocation.

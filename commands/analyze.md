@@ -76,7 +76,7 @@ If `{CANDIDATES}` is empty but `{SKIPPED_BY_DEFAULT}` is not, let `{SKIP_COUNT}`
 
 ## Step 3 — Size and count caps
 
-Count the files in `{CANDIDATES}`. If the count exceeds **100**, print a message with the real count and the resolved scan root — for example: `Refusing to scan 247 candidate files under /home/me/project — exceeds the 100-file cap. Narrow the scan path and retry.` Then STOP.
+Count the files in `{CANDIDATES}`. If the count exceeds **250**, print a message with the real count and the resolved scan root — for example: `Refusing to scan 312 candidate files under /home/me/project — exceeds the 250-file cap. Narrow the scan path and retry.` Then STOP.
 
 For each file in `{CANDIDATES}`, measure byte count via Bash, passing the path through an env var:
 
@@ -206,11 +206,25 @@ Next: /terse-md:run --all <SCAN_ROOT>  or  /terse-md:run <file>
 
   Before printing any path, **sanitize the displayed string**: replace any byte less than `0x20` or equal to `0x7f` with the literal character `?`. This prevents a filename containing control characters (e.g. `\r`, `\n`, ANSI escape sequences) from rewriting earlier lines or forging fake entries in the rendered report. Sanitization is display-only; the actual path used internally is unchanged.
 
-  Indent each entry by 2 spaces. Left-align the sanitized paths in a single column; pad each with spaces so the reason column begins 2 spaces past the longest path in this block. Example:
+  Indent each entry by 2 spaces. Left-align the sanitized paths in a single column; pad each with spaces so the reason column begins 2 spaces past the longest path in this block.
+
+  **Cap:** if `{SKIPPED_BY_DEFAULT}` contains more than **10** files, print only the first 10 (sorted alphabetically) and append a final summary line in the same indent: `(... and {EXTRA} more — {project_count} project_*.md, {memory_count} MEMORY.md)` where `{EXTRA}` = total minus 10, and the per-type counts are over ALL skipped files (not just the omitted tail). This keeps the report readable for auto-memory directories that may default-skip 100+ project files.
+
+  Example (small case, no cap):
   ```
   Skipped by default (re-run with --include-all to include):
     MEMORY.md                index file; already one-liners
     project_foo_20260419.md  narrative scratchpad; short half-life
+  ```
+
+  Example (large case, capped):
+  ```
+  Skipped by default (re-run with --include-all to include):
+    MEMORY.md                       index file; already one-liners
+    project_aaa.md                  narrative scratchpad; short half-life
+    project_bbb.md                  narrative scratchpad; short half-life
+    ... (8 more shown) ...
+    (... and 184 more — 193 project_*.md, 1 MEMORY.md)
   ```
 - If `{CANDIDATES}` was empty (Step 4 skipped the sample), omit the `Sample compression` and `Estimated total` lines and the `Top candidates by size:` block; still print the `Scanned N files, X,XXX tokens total.` header (with `N=0, X=0`), then whichever of the `Skipped by default` and `Skipped (>1 MiB):` blocks have content. At least one will, given Step 4 only routes here when something was skipped somewhere.
 

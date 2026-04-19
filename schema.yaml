@@ -67,13 +67,13 @@ properties:
           items:
             type: string
             minLength: 1
-            maxLength: 140
+            maxLength: 280
         prefer:
           type: array
           items:
             type: string
             minLength: 1
-            maxLength: 140
+            maxLength: 280
         on_violation:
           # what the reader should do when this rule is about to be broken
           enum: [abort, warn, fix-and-continue, ask-user]
